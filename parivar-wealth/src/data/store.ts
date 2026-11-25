@@ -1,6 +1,6 @@
 import type { AppUser, DBState, Perms, PricePoint, SchemeRow, StockRow } from '../core/types'
 
-export type Table = 'holders' | 'instruments' | 'txns' | 'sips'
+export type Table = 'holders' | 'instruments' | 'txns' | 'sips' | 'assets'
 
 export interface AuditRow {
   id: number
@@ -32,6 +32,10 @@ export interface Store {
   signOut(): Promise<void>
   /** move every entry and SIP of one family member to another (to merge duplicates) */
   reassignHolder(from: string, to: string): Promise<void>
+  /** photos: upload a (compressed) image, returns a storage path; photoUrl gives a viewable link */
+  uploadPhoto(blob: Blob, name: string): Promise<string>
+  photoUrl(path: string): Promise<string>
+  removePhoto(path: string): Promise<void>
   /** full price history (for trend charts) */
   allPrices(): Promise<PricePoint[]>
   /** demo only: wipe everything */

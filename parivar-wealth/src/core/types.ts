@@ -177,6 +177,8 @@ export interface TaxRules {
   last_reviewed: string
 }
 
+import type { Asset, MetalRates } from './assets'
+
 export interface DBState {
   holders: Holder[]
   instruments: Instrument[]
@@ -184,6 +186,8 @@ export interface DBState {
   sips: Sip[]
   prices: PricePoint[] // at least the latest per key
   rules: TaxRules
+  assets: Asset[]
+  metal: MetalRates | null
 }
 
 export const priceKey = (i: Pick<Instrument, 'kind' | 'code'>) => `${i.kind === 'MF' ? 'MF' : 'NSE'}:${i.code}`

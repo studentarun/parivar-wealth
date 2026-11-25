@@ -4,9 +4,11 @@ import { Badge, Btn, Card, Empty, Gain, inr, pct, ShareBar, Stat } from '../app/
 import { fmtDate } from '../core/dates'
 import { sumH, xirr } from '../core/valuation'
 import { AdviceCard } from './Tax'
+import { useNetWorth } from './wealth/Wealth'
 
 export default function Home() {
   const { d, db, visibleHolders, me } = useApp()
+  const nw = useNetWorth()
   const hs = d.holdings.filter((h) => visibleHolders.some((v) => v.id === h.pos.holder_id))
   if (!db.txns.length)
     return (
@@ -29,12 +31,25 @@ export default function Home() {
   const catList = [...cats.entries()].sort((a, b) => b[1] - a[1])
   const sipMonthly = db.sips.filter((s) => s.active && visibleHolders.some((v) => v.id === s.holder_id)).reduce((s, x) => s + x.amount, 0)
   const top = d.advice.filter((a) => a.level !== 'good').slice(0, 3)
+  const assetAlerts = d.assets.flatMap((x) => x.v.alerts.filter((al) => al.level === 'warn').map((al) => ({ id: x.a.id, name: x.a.name, text: al.text })))
   const ltReady = hs.reduce((s, h) => s + (h.pos.instrument.tax_class.startsWith('equity') ? Math.max(0, h.ltGain) : 0), 0)
 
   return (
     <div className="space-y-4">
+      <Link to="/wealth">
+        <Card className="hover:border-teal-300">
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-xs text-slate-500">Total net worth (funds, stocks, FDs, gold, property… − loans)</div>
+              <div className="num text-2xl font-semibold">{inr(nw.net)}</div>
+            </div>
+            <span className="text-sm text-teal-700">Wealth →</span>
+          </div>
+          {nw.items.length === 0 && <div className="mt-1 text-xs text-slate-500">Add FDs, gold, property and loans in the Wealth tab.</div>}
+        </Card>
+      </Link>
       <div className="flex items-end justify-between">
-        <h1 className="text-xl font-semibold">Family wealth</h1>
+        <h1 className="text-xl font-semibold">Funds & stocks</h1>
         <span className="text-xs text-slate-500">Prices as of {fmtDate(d.pricesAsOf)}</span>
       </div>
 
@@ -46,7 +61,7 @@ export default function Home() {
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3">
           <Stat label="Money put in" value={inr(t.invested, true)} />
-          <Stat label="Yearly return (XIRR)" value={pct(totalX)} />
+          <Stat label="Yearly return (XIRR)" value={pct(totalX)} sub={<Link to="/trends" className="text-teal-700">Trends →</Link>} />
           <Stat label="Monthly SIPs" value={inr(sipMonthly, true)} sub={<Link to="/sips" className="text-teal-700">Manage →</Link>} />
         </div>
       </Card>
@@ -79,6 +94,18 @@ export default function Home() {
           )
         })}
       </div>
+
+      {assetAlerts.length > 0 && (
+        <Card title="Coming up">
+          <div className="space-y-1 text-sm">
+            {assetAlerts.map((al) => (
+              <Link key={al.id + al.text} to={`/wealth/${al.id}`} className="block">
+                ⏰ <b>{al.name}</b> — {al.text}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {top.length > 0 && (
         <Card title="Things to do" right={<Link to="/tax" className="text-sm text-teal-700">All tips →</Link>}>

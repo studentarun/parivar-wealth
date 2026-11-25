@@ -2,6 +2,7 @@
 // with your Excel before the free cloud database is set up.
 import { DEFAULT_RULES } from '../core/rules'
 import type { AppUser, DBState, PricePoint, SchemeRow, StockRow, TaxRules } from '../core/types'
+import type { MetalRates } from '../core/assets'
 import { ALL_PERMS, uid, type AuditRow, type Store, type Table } from './store'
 
 const KEY = 'pw-demo-v1'
@@ -12,12 +13,13 @@ interface DemoData {
   instruments: DBState['instruments']
   txns: DBState['txns']
   sips: DBState['sips']
+  assets: DBState['assets']
   prices: PricePoint[]
   settings: Record<string, unknown>
   audit: AuditRow[]
 }
 
-const empty = (): DemoData => ({ holders: [], instruments: [], txns: [], sips: [], prices: [], settings: {}, audit: [] })
+const empty = (): DemoData => ({ holders: [], instruments: [], txns: [], sips: [], assets: [], prices: [], settings: {}, audit: [] })
 
 function read<T>(k: string, d: T): T {
   try {
@@ -37,7 +39,7 @@ function write(k: string, v: unknown) {
 
 export class DemoStore implements Store {
   mode = 'demo' as const
-  private d: DemoData = read(KEY, empty())
+  private d: DemoData = { ...empty(), ...read(KEY, empty()) }
   private schemes: SchemeRow[] = read(SKEY, [])
   private save() {
     write(KEY, this.d)
@@ -54,7 +56,9 @@ export class DemoStore implements Store {
       txns: [...this.d.txns],
       sips: [...this.d.sips],
       prices: [...this.d.prices],
-      rules: (this.d.settings.tax_rules as TaxRules) ?? DEFAULT_RULES,
+      rules: { ...DEFAULT_RULES, ...((this.d.settings.tax_rules as TaxRules) ?? {}) },
+      assets: [...this.d.assets],
+      metal: (this.d.settings.metal_rates as MetalRates) ?? null,
     }
   }
   async insert<T>(table: Table, rows: object[]): Promise<T[]> {
@@ -146,6 +150,18 @@ export class DemoStore implements Store {
     this.log('UPDATE', 'holders', { merged: from, into: to })
     this.save()
   }
+  async uploadPhoto(blob: Blob) {
+    // demo: keep the (already compressed) photo inline in this browser
+    return await new Promise<string>((res) => {
+      const r = new FileReader()
+      r.onload = () => res(String(r.result))
+      r.readAsDataURL(blob)
+    })
+  }
+  async photoUrl(path: string) {
+    return path
+  }
+  async removePhoto() {}
   async allPrices() {
     return [...this.d.prices]
   }

@@ -23,6 +23,10 @@ import Activity from './pages/settings/Activity'
 import History from './pages/History'
 import Plan from './pages/Plan'
 const Trends = lazy(() => import('./pages/Trends'))
+import Wealth from './pages/wealth/Wealth'
+import AssetEdit from './pages/wealth/AssetEdit'
+import AssetDetail from './pages/wealth/AssetDetail'
+import Metals from './pages/settings/Metals'
 
 const ENV_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -231,7 +235,7 @@ function Login({ sb }: { sb: SupabaseClient }) {
 const NAV = [
   { to: '/', label: 'Home', icon: 'M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z' },
   { to: '/holdings', label: 'Holdings', icon: 'M4 19V9m6 10V5m6 14v-7m4 7H2' },
-  { to: '/trends', label: 'Trends', icon: 'M3 17l5-5 4 4 8-8M15 8h5v5' },
+  { to: '/wealth', label: 'Wealth', icon: 'M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6' },
   { to: '/invest', label: 'Invest', icon: 'M12 5v14M5 12h14' },
   { to: '/tax', label: 'Tax tips', icon: 'M9 14l2 2 4-4M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z' },
   { to: '/more', label: 'More', icon: 'M5 12h.01M12 12h.01M19 12h.01' },
@@ -267,6 +271,11 @@ function Shell({ banner }: { banner?: React.ReactNode }) {
               <Route path="/h/:holder/:inst" element={<HoldingDetail />} />
               <Route path="/invest" element={<Invest />} />
               <Route path="/plan" element={<Plan />} />
+              <Route path="/wealth" element={<Wealth />} />
+              <Route path="/wealth/new" element={<AssetEdit />} />
+              <Route path="/wealth/:id" element={<AssetDetail />} />
+              <Route path="/wealth/:id/edit" element={<AssetEdit />} />
+              <Route path="/more/metals" element={<Metals />} />
               <Route path="/trends" element={<Suspense fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}><Trends /></Suspense>} />
               <Route path="/withdraw/:holder/:inst" element={<Withdraw />} />
               <Route path="/sips" element={<Sips />} />

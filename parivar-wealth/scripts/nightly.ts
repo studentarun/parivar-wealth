@@ -10,7 +10,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { unzipSync, strFromU8 } from 'fflate'
 import { addDays, todayIST } from '../src/core/dates'
-import { parseBhav, parseNavAll, parseNavHistory } from './parsers'
+import { parseBhav, parseIbja, parseNavAll, parseNavHistory } from './parsers'
 import { PriceBook } from '../src/core/prices'
 import { DEFAULT_RULES } from '../src/core/rules'
 import { dueDates, fillPending, runSips } from '../src/core/sip'
@@ -266,6 +266,16 @@ async function main() {
       log('NSE bhavcopy not reachable — using Yahoo fallback')
       await yahooFallback([...nseSyms])
     }
+  }
+
+  try {
+    const ib = parseIbja(await (await get('https://ibjarates.com/')).text())
+    if (ib) {
+      await sb.from('settings').upsert({ key: 'metal_rates', value: { ...ib, date: ib.date || today, source: 'IBJA' } })
+      log(`IBJA: gold 999 ₹${ib.gold24}/g, silver ₹${ib.silver}/g (${ib.date})`)
+    } else log('IBJA: rates not found on page')
+  } catch (e) {
+    log('IBJA failed: ' + String(e))
   }
 
   try {

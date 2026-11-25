@@ -8,6 +8,8 @@ export default function More() {
   const items: [string, string, string, boolean][] = [
     ['/more/family', 'Family members', 'Names, yearly income, clubbing — used for tax tips', true],
     ['/more/funds', 'Funds & stocks', 'Category, tax type, keep or exit, exit load', true],
+    ['/trends', 'Trends', 'Charts: value over time, monthly investing, SIP growth', true],
+    ['/more/metals', 'Gold & silver rates', 'IBJA rates used to value gold and silver', true],
     ['/plan', 'Invest new money', 'Questions → where to put it, which account', can('add')],
     ['/sips', 'SIPs', 'Pause, edit or stop monthly SIPs', true],
     ['/history', 'History', 'All entries and profit booked per year', true],
@@ -37,7 +39,6 @@ export default function More() {
       {store.mode === 'live' && <PriceStatus />}
       <Card title="Coming next">
         <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
-          <li>FDs, gold/silver, property, EPF/PPF/NPS, loans — full net worth with photos</li>
           <li>FIRE calculator: your number, years to reach it, extra SIP needed</li>
         </ul>
       </Card>

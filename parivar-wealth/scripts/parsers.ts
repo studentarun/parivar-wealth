@@ -73,3 +73,19 @@ export function parseBhav(csv: string, day: string, tracked: Set<string>) {
   }
   return { syms, prices }
 }
+
+/** IBJA (India Bullion & Jewellers Association) benchmark rates: gold ₹/10 g, silver ₹/kg → ₹ per gram */
+export function parseIbja(html: string): { date: string; gold24: number; silver: number } | null {
+  const pick = (base: string) => {
+    for (const s of ['PM', 'AM']) {
+      const m = html.match(new RegExp(`id="${base}_${s}"[^>]*>\\s*([\\d.,]+)\\s*<`))
+      if (m && Number(m[1].replace(/,/g, ''))) return Number(m[1].replace(/,/g, ''))
+    }
+    return 0
+  }
+  const g = pick('lblGold999')
+  const s = pick('lblSilver999')
+  const dm = html.match(/(\d{2})\/(\d{2})\/(\d{4})/)
+  if (!g) return null
+  return { date: dm ? `${dm[3]}-${dm[2]}-${dm[1]}` : '', gold24: g / 10, silver: s / 1000 }
+}

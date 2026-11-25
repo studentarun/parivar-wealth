@@ -3,6 +3,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_RULES } from '../core/rules'
 import type { AppUser, DBState, PricePoint, SchemeRow, StockRow, TaxRules } from '../core/types'
+import type { MetalRates } from '../core/assets'
 import type { AuditRow, Store, Table } from './store'
 
 export function makeClient(url: string, key: string) {
@@ -31,13 +32,15 @@ export class LiveStore implements Store {
 
   async loadAll(): Promise<DBState> {
     const sb = this.sb
-    const [holders, instruments, txns, sips, prices, rules] = await Promise.all([
+    const [holders, instruments, txns, sips, prices, rules, assets, metal] = await Promise.all([
       all(() => sb.from('holders').select('*').order('sort').order('created_at')),
       all(() => sb.from('instruments').select('*').order('name')),
       all(() => sb.from('txns').select('*').order('date').order('id')),
       all(() => sb.from('sips').select('*').order('created_at')),
       all(() => sb.from('latest_prices').select('*').order('key')),
       this.getSetting<TaxRules>('tax_rules'),
+      all(() => sb.from('assets').select('*').order('created_at')),
+      this.getSetting<MetalRates>('metal_rates'),
     ])
     const num = (v: unknown) => (v == null ? null : Number(v))
     return {
@@ -47,6 +50,8 @@ export class LiveStore implements Store {
       sips: sips.map((s: any) => ({ ...s, amount: Number(s.amount), charges: Number(s.charges ?? 0) })),
       prices: prices.map((p: any) => ({ key: p.key, date: p.date, price: Number(p.price) })),
       rules: { ...DEFAULT_RULES, ...(rules ?? {}) },
+      assets: assets.map((a: any) => ({ ...a, value_override: a.value_override == null ? null : Number(a.value_override) })),
+      metal: metal ?? null,
     }
   }
   async insert<T>(table: Table, rows: object[]): Promise<T[]> {
@@ -137,6 +142,20 @@ export class LiveStore implements Store {
     }
     const { error } = await this.sb.from('holders').update({ clubbed_with: to }).eq('clubbed_with', from)
     if (error) throw error
+  }
+  async uploadPhoto(blob: Blob, name: string) {
+    const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}-${name.replace(/[^\w.-]/g, '_')}`
+    const { error } = await this.sb.storage.from('photos').upload(path, blob, { contentType: blob.type || 'image/jpeg' })
+    if (error) throw error
+    return path
+  }
+  async photoUrl(path: string) {
+    const { data, error } = await this.sb.storage.from('photos').createSignedUrl(path, 3600)
+    if (error) throw error
+    return data.signedUrl
+  }
+  async removePhoto(path: string) {
+    await this.sb.storage.from('photos').remove([path])
   }
   async allPrices(): Promise<PricePoint[]> {
     const rows = await all(() => this.sb.from('prices').select('key,date,price').order('key').order('date'))

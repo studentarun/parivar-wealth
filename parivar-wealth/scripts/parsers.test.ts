@@ -24,3 +24,10 @@ describe('parsers', () => {
     expect(r.prices).toEqual([{ key: 'NSE:ITC', date: '2026-11-24', price: 410.5 }])
   })
 })
+import { parseIbja } from './parsers'
+describe('ibja', () => {
+  it('parses AM rates', () => {
+    const h = '<span>25/11/2026 02:28:47 PM</span><span id="lblGold999_AM">121310</span><span id="lblGold999_PM"></span><span id="lblSilver999_AM">143522</span>'
+    expect(parseIbja(h)).toEqual({ date: '2026-11-25', gold24: 12131, silver: 143.522 })
+  })
+})

@@ -7,6 +7,7 @@ import { DEFAULT_RULES } from '../core/rules'
 import { fillPending, runSips } from '../core/sip'
 import { personYears, type PersonYear } from '../core/tax'
 import type { AppUser, DBState, Holder } from '../core/types'
+import { valueAsset, type Asset, type Valuation } from '../core/assets'
 import { valueHoldings, type Holding } from '../core/valuation'
 import type { Store } from '../data/store'
 
@@ -20,6 +21,7 @@ export interface Derived {
   advice: Advice[]
   where: ReturnType<typeof whereToInvest>
   pricesAsOf: string | null
+  assets: { a: Asset; v: Valuation }[]
 }
 
 interface Ctx {
@@ -43,7 +45,7 @@ export const useApp = () => {
   return c
 }
 
-const EMPTY: DBState = { holders: [], instruments: [], txns: [], sips: [], prices: [], rules: DEFAULT_RULES }
+const EMPTY: DBState = { holders: [], instruments: [], txns: [], sips: [], prices: [], rules: DEFAULT_RULES, assets: [], metal: null }
 
 export function derive(db: DBState, today = todayIST()): Derived {
   const book = new PriceBook(db.prices)
@@ -54,7 +56,8 @@ export function derive(db: DBState, today = todayIST()): Derived {
   const advice = buildAdvice({ holdings, holders: db.holders, years, sips: db.sips, txns: db.txns, rules: db.rules, today })
   const where = whereToInvest(years, holdings, db.rules)
   const pricesAsOf = holdings.map((h) => h.priceDate).filter(Boolean).sort().pop() ?? null
-  return { today, fy, book, positions, holdings, years, advice, where, pricesAsOf }
+  const assets = db.assets.filter((a) => a.active).map((a) => ({ a, v: valueAsset(a, today, db.metal) }))
+  return { today, fy, book, positions, holdings, years, advice, where, pricesAsOf, assets }
 }
 
 export function AppProvider({ store, me, children }: { store: Store; me: AppUser; children: ReactNode }) {
