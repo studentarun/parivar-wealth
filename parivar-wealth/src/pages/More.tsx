@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../app/state'
 import { Badge, Card, Page } from '../app/ui'
@@ -33,6 +34,7 @@ export default function More() {
             </Link>
           ))}
       </div>
+      {store.mode === 'live' && <PriceStatus />}
       <Card title="Coming next">
         <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
           <li>FDs, gold/silver, property, EPF/PPF/NPS, loans — full net worth with photos</li>
@@ -60,5 +62,29 @@ export default function More() {
         )}
       </div>
     </Page>
+  )
+}
+
+function PriceStatus() {
+  const { store } = useApp()
+  const [st, setSt] = useState<{ ok: boolean; at: string; lines: string[] } | null>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    store.getSetting<{ ok: boolean; at: string; lines: string[] }>('nightly_status').then(setSt)
+  }, [store])
+  return (
+    <Card title="Nightly price update" right={st && <Badge tone={st.ok ? 'green' : 'red'}>{st.ok ? 'OK' : 'Problem'}</Badge>}>
+      {!st ? (
+        <p className="text-sm text-slate-500">Hasn't run yet.</p>
+      ) : (
+        <>
+          <p className="text-sm text-slate-600">Last run: {new Date(st.at).toLocaleString('en-IN')}</p>
+          <button className="mt-1 text-xs text-teal-700" onClick={() => setOpen(!open)}>
+            {open ? 'Hide' : 'Show'} details
+          </button>
+          {open && <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-[11px]">{st.lines.join('\n')}</pre>}
+        </>
+      )}
+    </Card>
   )
 }
