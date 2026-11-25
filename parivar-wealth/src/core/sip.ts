@@ -25,14 +25,14 @@ export function dueDates(sip: Sip, after: string | null | undefined, upto: strin
 export const roundUnits = (u: number, kind: Instrument['kind']) => (kind === 'MF' ? Math.floor(u * 1000) / 1000 : Math.floor(u))
 
 /** Units allotted for an amount: MF deducts stamp duty, stocks/ETFs buy whole shares. */
-export function unitsFor(amount: number, price: number, inst: Instrument, r: TaxRules) {
+export function unitsFor(amount: number, price: number, inst: Instrument, r: TaxRules, charges = 0) {
   if (inst.kind === 'MF') {
     const net = amount * (1 - r.stamp_duty / 100)
     const units = roundUnits(net / price, 'MF')
     return { units, amount }
   }
-  const units = Math.floor(amount / price)
-  return { units, amount: units * price }
+  const units = Math.floor(Math.max(0, amount - charges) / price)
+  return { units, amount: Math.round(units * price * 100) / 100 }
 }
 
 export interface SipRun {
@@ -56,7 +56,7 @@ export function runSips(sips: Sip[], instruments: Instrument[], book: PriceBook,
       const p = book.onOrAfter(priceKey(i), due, today)
       // Don't allot from a stale price more than 7 days after due date (data gap) — wait instead.
       if (!p || p.date > addDays(due, 7)) break
-      const { units, amount } = unitsFor(s.amount, p.price, i, r)
+      const { units, amount } = unitsFor(s.amount, p.price, i, r, Number(s.charges ?? 0))
       if (units > 0)
         res.newTxns.push({
           holder_id: s.holder_id,

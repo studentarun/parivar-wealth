@@ -1,7 +1,7 @@
 import { daysBetween, fmtDate, fyEnd, fyOf } from './dates'
 import { ltDate, unlockDate } from './lots'
 import type { Holding } from './valuation'
-import { marginalRate, type PersonYear } from './tax'
+import { marginalRate, regimeOf, type PersonYear } from './tax'
 import type { Holder, Sip, TaxRules, Txn } from './types'
 
 export type Level = 'act' | 'warn' | 'info' | 'good'
@@ -313,16 +313,17 @@ export function whereToInvest(years: PersonYear[], holdings: Holding[], r: TaxRu
       score: yrs,
       reason: `Unbooked equity profit ${inr(queued)} ≈ ${yrs.toFixed(1)} years of the ₹1.25L tax-free limit already queued${who}.`,
     })
-    const mr = marginalRate(py.person.other_income, r)
-    const room = Math.max(0, r.basic_exemption - py.person.other_income)
+    const rg = regimeOf(r, py.person)
+    const mr = marginalRate(py.person.other_income, r, py.person)
+    const room = Math.max(0, rg.basic - py.person.other_income)
     other.push({
       person: py.person,
       members: py.members,
       score: mr - room / 1e6,
       reason:
-        `Income ${inr(py.person.other_income)}/yr → top slab ${mr}%` +
+        `Taxable income ${inr(py.person.other_income)}/yr (${py.person.regime === 'old' ? 'old' : 'new'} regime) → top slab ${mr}%` +
         (room > 0 ? `; ${inr(room)} of yearly income/gains is tax-free (unused basic exemption)` : '') +
-        (py.person.other_income + 1 <= r.rebate_income_limit ? '; slab-taxed income is tax-free up to ₹12L total (rebate)' : '') +
+        (py.person.other_income + 1 <= rg.rebateLimit ? `; slab-taxed income is tax-free up to ₹${(rg.rebateLimit / 1e5).toFixed(0)}L total (rebate)` : '') +
         who +
         '.',
     })

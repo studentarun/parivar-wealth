@@ -26,6 +26,7 @@ export default function Invest() {
   const [date, setDate] = useState(d.today)
   const [after, setAfter] = useState(nowISTHour() >= 15)
   const [day, setDay] = useState(String(Math.min(28, Number(d.today.slice(8)))))
+  const [charges, setCharges] = useState('')
   const [busy, setBusy] = useState(false)
 
   const inst = pick?.existing
@@ -102,7 +103,7 @@ export default function Invest() {
         const dd = Number(day)
         let start = monthDate(Number(d.today.slice(0, 4)), Number(d.today.slice(5, 7)), dd)
         if (start <= d.today) start = addMonths(start, 1)
-        await store.insert('sips', [{ holder_id: holder, instrument_id: i.id, amount: amt, day: dd, start_date: start, active: true, last_run_date: null }])
+        await store.insert('sips', [{ holder_id: holder, instrument_id: i.id, amount: amt, day: dd, start_date: start, active: true, last_run_date: null, ...(i.kind !== 'MF' ? { charges: Number(charges) || 0 } : {}) }])
         toast(`SIP started — first instalment ${fmtDate(start)}`)
       } else if (isMF) {
         const amt = Number(amount)
@@ -224,6 +225,17 @@ export default function Invest() {
               <Field label="Date">
                 <input type="date" value={date} max={d.today} onChange={(e) => setDate(e.target.value)} />
               </Field>
+            </div>
+          )}
+          {pick && mode === 'sip' && !isMF && (
+            <div className="rounded-lg bg-sky-50 p-3 text-xs text-sky-900">
+              Stocks/ETFs can only be bought in <b>whole units</b>, so each month's actual amount changes with the price (that's why SILVERBEES shows ₹2,249 one month and ₹2,367 the next).
+              The app buys as many whole units as fit in the amount, after keeping aside the charges below.
+              <div className="mt-2 w-40">
+                <Field label="Keep aside for charges (₹)">
+                  <input inputMode="decimal" value={charges} onChange={(e) => setCharges(e.target.value)} placeholder="e.g. 60" />
+                </Field>
+              </div>
             </div>
           )}
           {pick && mode === 'sip' && (

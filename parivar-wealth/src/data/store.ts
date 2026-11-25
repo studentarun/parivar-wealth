@@ -30,6 +30,10 @@ export interface Store {
   removeUser(user_id: string): Promise<void>
   audit(limit: number): Promise<AuditRow[]>
   signOut(): Promise<void>
+  /** move every entry and SIP of one family member to another (to merge duplicates) */
+  reassignHolder(from: string, to: string): Promise<void>
+  /** full price history (for trend charts) */
+  allPrices(): Promise<PricePoint[]>
   /** demo only: wipe everything */
   reset?(): Promise<void>
   /** demo only: seed the AMFI scheme list from an Excel sheet */

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '../../app/state'
 import { Badge, Btn, Card, Page } from '../../app/ui'
 import type { AppUser, Perms } from '../../core/types'
@@ -25,9 +26,11 @@ export default function Users() {
   }
   return (
     <Page title="Family logins & permissions" back>
+      <ShareCard users={users} />
       <Card>
         <p className="text-sm text-slate-600">
-          Family members open the app link, tap <b>Create an account</b>, and appear here as <Badge tone="amber">pending</Badge>. Approve them and choose what they can do.
+          Everyone sees the <b>same family portfolio</b>. People who sign up with an email you saved in <Link className="text-teal-700 underline" to="/more/family">Family members</Link> get
+          in straight away as members (can add &amp; withdraw, can't delete or change settings). Anyone else waits here as <Badge tone="amber">pending</Badge> until you approve.
           {store.mode === 'demo' && ' (In demo mode there is only you.)'}
         </p>
       </Card>
@@ -90,5 +93,52 @@ export default function Users() {
         </Card>
       ))}
     </Page>
+  )
+}
+
+function ShareCard({ users }: { users: AppUser[] }) {
+  const { db, toast } = useApp()
+  const link = location.origin + location.pathname
+  const msg = `Join our family wealth app: ${link}\nTap "Create an account" and use the email I saved for you.`
+  const share = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: 'Parivar Wealth', text: msg })
+      else {
+        await navigator.clipboard.writeText(msg)
+        toast('Invite message copied')
+      }
+    } catch {
+      /* cancelled */
+    }
+  }
+  return (
+    <Card title="Invite family members">
+      <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
+        <li>
+          Save each person's email in <Link className="text-teal-700 underline" to="/more/family">Family members</Link>.
+        </li>
+        <li>Send them the app link (button below — WhatsApp works).</li>
+        <li>They tap <b>Create an account</b> with that email and a password of their choice.</li>
+      </ol>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Btn small onClick={share}>Share invite</Btn>
+        <a className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white" href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer">
+          Send on WhatsApp
+        </a>
+      </div>
+      <div className="mt-3 divide-y divide-slate-100 text-sm">
+        {db.holders.map((h) => {
+          const u = h.email ? users.find((x) => x.email?.toLowerCase() === h.email!.toLowerCase()) : undefined
+          return (
+            <div key={h.id} className="flex items-center justify-between py-1.5">
+              <span>
+                {h.name} <span className="text-xs text-slate-500">{h.email ?? 'no email saved'}</span>
+              </span>
+              {u ? <Badge tone="green">joined</Badge> : h.email ? <Badge tone="amber">not signed up yet</Badge> : <Badge>—</Badge>}
+            </div>
+          )
+        })}
+      </div>
+    </Card>
   )
 }

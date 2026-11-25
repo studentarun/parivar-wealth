@@ -1,6 +1,21 @@
 import { fyOf } from './dates'
 import type { Position, Realised } from './lots'
-import type { Holder, TaxRules } from './types'
+import type { AgeGroup, Holder, TaxRules } from './types'
+
+export interface TaxProfile {
+  regime?: 'new' | 'old'
+  age_group?: AgeGroup
+}
+type Slabs = { upto: number | null; rate: number }[]
+
+/** Slabs, basic exemption and rebate for a person's regime and age. */
+export function regimeOf(r: TaxRules, p?: TaxProfile) {
+  if (p?.regime === 'old') {
+    const slabs: Slabs = p.age_group === '80plus' ? r.old_slabs_80plus : p.age_group === '60to79' ? r.old_slabs_60to79 : r.old_slabs_below60
+    return { slabs, basic: slabs[0].upto ?? 0, rebateLimit: r.old_rebate_income_limit, rebateMax: r.old_rebate_max }
+  }
+  return { slabs: r.slabs, basic: r.basic_exemption, rebateLimit: r.rebate_income_limit, rebateMax: r.rebate_max }
+}
 
 /** Capital gains of one financial year, grouped the way the tax law treats them. */
 export interface Gains {
@@ -58,10 +73,10 @@ export function setOff(g: Gains): Gains & { carryST: number; carryLT: number } {
   return { eqST, eqLT, neLT, slab, carryST: stLoss, carryLT: ltLoss }
 }
 
-export function slabTax(income: number, r: TaxRules): number {
+export function slabTax(income: number, r: TaxRules, p?: TaxProfile): number {
   let tax = 0
   let prev = 0
-  for (const s of r.slabs) {
+  for (const s of regimeOf(r, p).slabs) {
     const top = s.upto ?? Infinity
     if (income > prev) tax += ((Math.min(income, top) - prev) * s.rate) / 100
     prev = top
@@ -69,14 +84,15 @@ export function slabTax(income: number, r: TaxRules): number {
   return tax
 }
 
-export function marginalRate(income: number, r: TaxRules): number {
+export function marginalRate(income: number, r: TaxRules, p?: TaxProfile): number {
+  const slabs = regimeOf(r, p).slabs
   let prev = 0
-  for (const s of r.slabs) {
+  for (const s of slabs) {
     const top = s.upto ?? Infinity
     if (income < top) return income >= prev ? s.rate : 0
     prev = top
   }
-  return r.slabs[r.slabs.length - 1].rate
+  return slabs[slabs.length - 1].rate
 }
 
 export interface TaxCalc {
@@ -87,15 +103,16 @@ export interface TaxCalc {
 }
 
 /** Estimated tax for a person for the year (other income + capital gains). Includes cess. */
-export function computeTax(otherIncome: number, gIn: Gains, r: TaxRules): TaxCalc {
+export function computeTax(otherIncome: number, gIn: Gains, r: TaxRules, prof?: TaxProfile): TaxCalc {
+  const rg = regimeOf(r, prof)
   const g = setOff(gIn)
   const normal = Math.max(0, otherIncome + g.slab)
-  const nTax = slabTax(normal, r)
+  const nTax = slabTax(normal, r, prof)
   const exemptionUsed = Math.min(g.eqLT, r.ltcg_exemption)
   let eqLT = g.eqLT - exemptionUsed
   let eqST = g.eqST
   let neLT = g.neLT
-  let shortfall = Math.max(0, r.basic_exemption - normal)
+  let shortfall = Math.max(0, rg.basic - normal)
   const sf0 = shortfall
   const use = (v: number) => {
     const t = Math.min(v, shortfall)
@@ -106,7 +123,7 @@ export function computeTax(otherIncome: number, gIn: Gains, r: TaxRules): TaxCal
   eqLT = use(eqLT)
   neLT = use(neLT)
   const totalIncome = normal + g.eqST + g.eqLT + g.neLT
-  const rebate = totalIncome <= r.rebate_income_limit ? Math.min(nTax, r.rebate_max) : 0
+  const rebate = totalIncome <= rg.rebateLimit ? Math.min(nTax, rg.rebateMax) : 0
   const sp1 = (eqST * r.equity_st_rate) / 100
   const sp2 = (eqLT * r.equity_lt_rate) / 100
   const sp3 = (neLT * r.nonequity_lt_rate) / 100
@@ -148,7 +165,7 @@ export function personYears(positions: Position[], holders: Holder[], fy: number
     const ids = new Set(members.map((m) => m.id))
     const rs = positions.filter((p) => ids.has(p.holder_id)).flatMap((p) => p.realised.filter((x) => fyOf(x.sell_date) === fy))
     const gains = gainsOf(rs)
-    const tax = computeTax(person.other_income, gains, r)
+    const tax = computeTax(person.other_income, gains, r, person)
     const so = setOff(gains)
     const normal = Math.max(0, person.other_income + so.slab)
     out.push({
@@ -157,7 +174,7 @@ export function personYears(positions: Position[], holders: Holder[], fy: number
       gains,
       tax,
       exemptionLeft: Math.max(0, r.ltcg_exemption - so.eqLT),
-      shortfallLeft: Math.max(0, r.basic_exemption - normal - tax.shortfallUsed),
+      shortfallLeft: Math.max(0, regimeOf(r, person).basic - normal - tax.shortfallUsed),
     })
   }
   return out
@@ -165,5 +182,5 @@ export function personYears(positions: Position[], holders: Holder[], fy: number
 
 /** Extra tax caused by adding `extra` gains to a person's year. */
 export function extraTax(py: PersonYear, extra: Gains, r: TaxRules): number {
-  return computeTax(py.person.other_income, addGains(py.gains, extra), r).total - py.tax.total
+  return computeTax(py.person.other_income, addGains(py.gains, extra), r, py.person).total - py.tax.total
 }

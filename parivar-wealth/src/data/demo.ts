@@ -139,6 +139,16 @@ export class DemoStore implements Store {
     return this.d.audit.slice(0, limit)
   }
   async signOut() {}
+  async reassignHolder(from: string, to: string) {
+    this.d.txns = this.d.txns.map((t) => (t.holder_id === from ? { ...t, holder_id: to } : t))
+    this.d.sips = this.d.sips.map((t) => (t.holder_id === from ? { ...t, holder_id: to } : t))
+    this.d.holders = this.d.holders.map((h) => (h.clubbed_with === from ? { ...h, clubbed_with: to } : h))
+    this.log('UPDATE', 'holders', { merged: from, into: to })
+    this.save()
+  }
+  async allPrices() {
+    return [...this.d.prices]
+  }
   async reset() {
     this.d = empty()
     this.save()

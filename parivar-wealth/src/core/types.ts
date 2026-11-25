@@ -32,6 +32,24 @@ export interface Holder {
   /** If this person's investments were funded by their spouse, gains are taxed in the spouse's hands (clubbing). */
   clubbed_with?: string | null
   sort?: number
+  /** login email of this family member — signing up with it gives instant access */
+  email?: string | null
+  regime?: 'new' | 'old'
+  age_group?: AgeGroup
+  /** gross yearly income by source; other_income (taxable) is calculated from it unless income_override */
+  income?: IncomeSources | null
+  income_override?: boolean
+}
+
+export type AgeGroup = 'below60' | '60to79' | '80plus'
+export interface IncomeSources {
+  salary?: number
+  pension?: number
+  rent?: number
+  interest?: number
+  other?: number
+  /** old regime only: 80C, 80D, home-loan interest etc. */
+  deductions?: number
 }
 
 export interface Instrument {
@@ -81,6 +99,8 @@ export interface Sip {
   start_date: string
   end_date?: string | null
   active: boolean
+  /** stocks/ETFs: money kept aside for brokerage & charges; whole units are bought with the rest */
+  charges?: number
   /** last due date that has been turned into a transaction */
   last_run_date?: string | null
 }
@@ -144,6 +164,14 @@ export interface TaxRules {
   slabs: { upto: number | null; rate: number }[]
   rebate_income_limit: number
   rebate_max: number
+  /** old tax regime */
+  old_slabs_below60: { upto: number | null; rate: number }[]
+  old_slabs_60to79: { upto: number | null; rate: number }[]
+  old_slabs_80plus: { upto: number | null; rate: number }[]
+  old_rebate_income_limit: number
+  old_rebate_max: number
+  std_deduction_new: number
+  std_deduction_old: number
   harvest_buffer: number
   near_lt_warn_days: number
   last_reviewed: string

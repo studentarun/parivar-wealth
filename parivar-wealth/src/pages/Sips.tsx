@@ -41,7 +41,8 @@ export default function Sips() {
                     <div className="min-w-0">
                       <div className="truncate text-sm">{name(s.instrument_id)}</div>
                       <div className="text-xs text-slate-500">
-                        {inr(s.amount)} on day {s.day} · last {fmtDate(s.last_run_date)} · next {s.active ? fmtDate(next(s)) : '—'}
+                        {inr(s.amount)} on day {s.day}
+                        {inst && inst.kind !== 'MF' && ` (whole units, ₹${s.charges ?? 0} kept for charges)`} · last {fmtDate(s.last_run_date)} · next {s.active ? fmtDate(next(s)) : '—'}
                         {inst && !inst.keep && <Badge tone="amber">fund marked Exit</Badge>}
                       </div>
                     </div>
@@ -57,8 +58,16 @@ export default function Sips() {
                           small
                           variant="ghost"
                           onClick={() => {
-                            const v = prompt('New monthly amount (₹)', String(s.amount))
-                            if (v && Number(v) > 0) act(() => store.update('sips', s.id, { amount: Number(v) }), 'Amount updated')
+                            const v = prompt('Monthly amount (₹)', String(s.amount))
+                            if (!v || !(Number(v) > 0)) return
+                            const d = prompt('SIP date (day of month, 1–28)', String(s.day))
+                            const day = Math.max(1, Math.min(28, Number(d) || s.day))
+                            let charges = Number(s.charges ?? 0)
+                            if (inst && inst.kind !== 'MF') {
+                              const c = prompt('Keep aside for brokerage/charges (₹) — whole units are bought with the rest', String(charges))
+                              charges = Math.max(0, Number(c) || 0)
+                            }
+                            act(() => store.update('sips', s.id, { amount: Number(v), day, charges }), 'SIP updated')
                           }}
                         >
                           Edit

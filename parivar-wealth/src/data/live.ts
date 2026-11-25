@@ -44,7 +44,7 @@ export class LiveStore implements Store {
       holders: holders.map((h: any) => ({ ...h, other_income: Number(h.other_income) })),
       instruments: instruments.map((i: any) => ({ ...i, exit_load_pct: Number(i.exit_load_pct) })),
       txns: txns.map((t: any) => ({ ...t, units: num(t.units), price: num(t.price), amount: num(t.amount) })),
-      sips: sips.map((s: any) => ({ ...s, amount: Number(s.amount) })),
+      sips: sips.map((s: any) => ({ ...s, amount: Number(s.amount), charges: Number(s.charges ?? 0) })),
       prices: prices.map((p: any) => ({ key: p.key, date: p.date, price: Number(p.price) })),
       rules: { ...DEFAULT_RULES, ...(rules ?? {}) },
     }
@@ -129,6 +129,18 @@ export class LiveStore implements Store {
   async audit(limit: number): Promise<AuditRow[]> {
     const { data } = await this.sb.from('audit_log').select('*').order('at', { ascending: false }).limit(limit)
     return (data ?? []) as AuditRow[]
+  }
+  async reassignHolder(from: string, to: string) {
+    for (const t of ['txns', 'sips'] as const) {
+      const { error } = await this.sb.from(t).update({ holder_id: to }).eq('holder_id', from)
+      if (error) throw error
+    }
+    const { error } = await this.sb.from('holders').update({ clubbed_with: to }).eq('clubbed_with', from)
+    if (error) throw error
+  }
+  async allPrices(): Promise<PricePoint[]> {
+    const rows = await all(() => this.sb.from('prices').select('key,date,price').order('key').order('date'))
+    return rows.map((p: any) => ({ key: p.key, date: p.date, price: Number(p.price) }))
   }
   async signOut() {
     await this.sb.auth.signOut()

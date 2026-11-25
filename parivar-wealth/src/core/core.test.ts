@@ -3,7 +3,7 @@ import { DEFAULT_RULES as R } from './rules'
 import { addMonths, fyOf, toISODate } from './dates'
 import { buildPositions, ltDate, simulateSell } from './lots'
 import { computeTax, ZERO } from './tax'
-import { dueDates, runSips, fillPending } from './sip'
+import { dueDates, runSips, fillPending, unitsFor } from './sip'
 import { PriceBook } from './prices'
 import type { Instrument, Sip, Txn } from './types'
 import { harvestPlan } from './advice'
@@ -89,4 +89,32 @@ describe('harvest', () => {
     expect(p.rows[0].units).toBeCloseTo(1000 + 230, 0)
   })
   it('xirr ~10%', () => expect(xirr([{ date: '2025-01-01', amount: -100 }, { date: '2026-01-01', amount: 110 }])!).toBeCloseTo(0.1, 2))
+})
+
+describe('ETF SIP by amount (whole units, charges kept aside)', () => {
+  it('matches Groww-style varying amounts', () => {
+    const etf: Instrument = { ...mf, id: 'e', kind: 'ETF', code: 'GOLDBEES', tax_class: 'listed_nonequity' }
+    expect(unitsFor(5000, 124.1, etf, R, 70).units).toBe(39)
+    expect(unitsFor(5000, 120.09, etf, R, 70).units).toBe(41)
+  })
+})
+
+import { taxableIncome } from './income'
+describe('income → taxable income', () => {
+  it('pensioner with 6L pension pays no tax in new regime', () => {
+    const t = taxableIncome({ pension: 600000 }, { regime: 'new', age_group: '60to79' }, R)
+    expect(t.taxable).toBe(525000)
+    expect(t.tax).toBe(0)
+  })
+  it('rent 3L → 2.1L taxable, no tax', () => {
+    const t = taxableIncome({ rent: 300000 }, { regime: 'new' }, R)
+    expect(t.taxable).toBe(210000)
+    expect(t.tax).toBe(0)
+  })
+  it('old regime with 80C', () => {
+    const t = taxableIncome({ salary: 1500000, deductions: 150000 }, { regime: 'old', age_group: 'below60' }, R)
+    expect(t.taxable).toBe(1300000)
+    // 12,500 + 1,00,000 + 90,000 = 2,02,500 + 4% cess
+    expect(t.tax).toBe(Math.round(202500 * 1.04))
+  })
 })

@@ -154,6 +154,76 @@ async function yahooFallback(symbols: string[]) {
   log(`Yahoo fallback: ${rows.length} closes`)
 }
 
+// ───────── 4. Month-end price history (for the Trends charts), filled a few years at a time ─────────
+async function backfillMonthEnds(mfCodes: Set<string>, nseSyms: Set<string>) {
+  const first = (await sb.from('txns').select('date').order('date').limit(1)).data?.[0]?.date as string | undefined
+  if (!first) return
+  const st = (await sb.from('settings').select('value').eq('key', 'backfill').maybeSingle()).data?.value as { done?: string[] } | undefined
+  const done = new Set(st?.done ?? [])
+  const months: string[] = []
+  let [y, m] = first.split('-').map(Number)
+  const thisMonth = today.slice(0, 7)
+  for (;;) {
+    const mk = `${y}-${String(m).padStart(2, '0')}`
+    if (mk >= thisMonth) break
+    if (!done.has(mk)) months.push(mk)
+    m++
+    if (m > 12) (m = 1), y++
+  }
+  if (!months.length) return
+  const batch = months.reverse().slice(0, 30) // newest first
+  let nseOk = 0
+  let nseFail = 0
+  for (const mk of batch) {
+    const [yy, mm] = mk.split('-').map(Number)
+    const end = `${mk}-${String(new Date(Date.UTC(yy, mm, 0)).getUTCDate()).padStart(2, '0')}`
+    if (mfCodes.size) {
+      try {
+        const txt = await (await get(`https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx?frmdt=${amfiDate(addDays(end, -5))}&todt=${amfiDate(end)}`)).text()
+        await upsert('prices', parseNavHistory(txt, mfCodes), 'key,date')
+      } catch (e) {
+        log(`backfill AMFI ${mk} failed: ${String(e)}`)
+        continue
+      }
+    }
+    if (nseSyms.size && nseFail < 3) {
+      let got = false
+      for (let d = end; d >= addDays(end, -6) && !got; d = addDays(d, -1)) {
+        const dow = new Date(d + 'T00:00:00Z').getUTCDay()
+        if (dow === 0 || dow === 6) continue
+        got = await nseDay(d, nseSyms, false)
+      }
+      if (got) nseOk++
+      else nseFail++
+    }
+    done.add(mk)
+  }
+  if (nseSyms.size && nseFail >= 3) await yahooMonthly([...nseSyms])
+  await sb.from('settings').upsert({ key: 'backfill', value: { done: [...done].sort() } })
+  log(`Month-end history: ${batch.length} months filled (${months.length - batch.length} left)${nseSyms.size ? `, NSE ok ${nseOk}` : ''}`)
+}
+
+async function yahooMonthly(symbols: string[]) {
+  const rows: PricePoint[] = []
+  for (const s of symbols) {
+    try {
+      const j: any = await (await get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}.NS?range=10y&interval=1mo`, 2)).json()
+      const r = j.chart.result[0]
+      r.timestamp.forEach((t: number, i: number) => {
+        const close = r.indicators.quote[0].close[i]
+        if (close == null) return
+        const d = new Date(t * 1000 + 6 * 3600000)
+        const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+        if (end < today) rows.push({ key: `NSE:${s}`, date: end, price: Math.round(close * 100) / 100 })
+      })
+    } catch {
+      /* delisted / renamed symbols */
+    }
+  }
+  await upsert('prices', rows, 'key,date')
+  log(`Yahoo monthly history: ${rows.length} month-end closes (NSE archive blocked)`)
+}
+
 // ───────── main ─────────
 async function main() {
   const instruments = await all<Instrument>('instruments')
@@ -196,6 +266,12 @@ async function main() {
       log('NSE bhavcopy not reachable — using Yahoo fallback')
       await yahooFallback([...nseSyms])
     }
+  }
+
+  try {
+    await backfillMonthEnds(mfCodes, nseSyms)
+  } catch (e) {
+    log('Month-end history failed: ' + String(e))
   }
 
   // SIPs + pending orders
