@@ -22,7 +22,17 @@ if (!URL_ || !KEY) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_KEY missing'
 const sb = createClient(URL_, KEY, { auth: { persistSession: false } })
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36', Accept: '*/*' }
 const today = todayIST()
-const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a)
+const lines: string[] = []
+let problem = false
+const log = (...a: unknown[]) => {
+  const l = a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')
+  lines.push(l)
+  console.log(new Date().toISOString().slice(11, 19), l)
+}
+async function saveStatus(ok: boolean) {
+  // Shown in the app under More → Price updates
+  await sb.from('settings').upsert({ key: 'nightly_status', value: { ok, at: new Date().toISOString(), today, lines: lines.slice(-40) } })
+}
 
 async function all<T>(table: string, select = '*', filter?: (q: any) => any): Promise<T[]> {
   const out: T[] = []
@@ -37,6 +47,8 @@ async function all<T>(table: string, select = '*', filter?: (q: any) => any): Pr
   return out
 }
 async function upsert(table: string, rows: object[], onConflict?: string) {
+  const keyOf = (r: any) => (onConflict === 'key,date' ? `${r.key}|${r.date}` : (r.code ?? r.symbol ?? JSON.stringify(r)))
+  rows = [...new Map(rows.map((r) => [keyOf(r), r])).values()]
   for (let i = 0; i < rows.length; i += 1000) {
     const { error } = await sb.from(table).upsert(rows.slice(i, i + 1000), onConflict ? { onConflict } : undefined)
     if (error) throw new Error(`${table}: ${error.message}`)
@@ -63,8 +75,20 @@ const amfiDate = (iso: string) => {
 
 // ───────── 1. AMFI latest NAVs ─────────
 async function amfiLatest(tracked: Set<string>) {
-  const txt = await (await get('https://www.amfiindia.com/spages/NAVAll.txt')).text()
-  const schemes = parseNavAll(txt)
+  let schemes: ReturnType<typeof parseNavAll> = []
+  for (const url of ['https://portal.amfiindia.com/spages/NAVAll.txt', 'https://www.amfiindia.com/spages/NAVAll.txt']) {
+    try {
+      const txt = await (await get(url)).text()
+      schemes = parseNavAll(txt)
+      log(`AMFI ${url}: ${txt.length} bytes, ${schemes.length} schemes`)
+      if (schemes.length > 1000) break
+    } catch (e) {
+      log(`AMFI ${url} failed: ${String(e)}`)
+    }
+  }
+  if (schemes.length < 1000) throw new Error('AMFI NAV file could not be read')
+  // a scheme code can appear twice in the file — keep the last one so upsert doesn't fail
+  schemes = [...new Map(schemes.map((x) => [x.code, x])).values()]
   log(`AMFI: ${schemes.length} schemes`)
   await upsert('amfi_schemes', schemes)
   const prices = schemes.filter((s) => tracked.has(s.code)).map((s) => ({ key: `MF:${s.code}`, date: s.nav_date, price: s.nav }))
@@ -151,7 +175,8 @@ async function main() {
   try {
     await amfiLatest(mfCodes)
   } catch (e) {
-    log('AMFI latest failed', String(e))
+    problem = true
+    log('AMFI latest failed: ' + String(e))
   }
   if (mfCodes.size && needFrom < addDays(today, -1)) {
     await amfiHistory(mfCodes, needFrom, addDays(today, -1))
@@ -167,7 +192,10 @@ async function main() {
       if (count && d !== today) continue
       if (await nseDay(d, nseSyms, ok === 0)) ok++
     }
-    if (!ok) await yahooFallback([...nseSyms])
+    if (!ok) {
+      log('NSE bhavcopy not reachable — using Yahoo fallback')
+      await yahooFallback([...nseSyms])
+    }
   }
 
   // SIPs + pending orders
@@ -185,7 +213,11 @@ async function main() {
   for (const t of run.newTxns) log('  +', instById.get(t.instrument_id)?.name, t.date, t.amount, '@', t.price)
 }
 
-main().catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+main()
+  .then(() => saveStatus(!problem))
+  .catch(async (e) => {
+    console.error(e)
+    log('FAILED: ' + (e?.message ?? String(e)))
+    await saveStatus(false).catch(() => {})
+    process.exit(1)
+  })
