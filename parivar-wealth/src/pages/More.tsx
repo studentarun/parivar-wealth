@@ -8,6 +8,7 @@ export default function More() {
   const items: [string, string, string, boolean][] = [
     ['/more/family', 'Family members', 'Names, yearly income, clubbing — used for tax tips', true],
     ['/more/funds', 'Funds & stocks', 'Category, tax type, keep or exit, exit load', true],
+    ['/fire', 'FIRE plan', 'Your number, when you can retire, monthly investing needed', true],
     ['/trends', 'Trends', 'Charts: value over time, monthly investing, SIP growth', true],
     ['/more/metals', 'Gold & silver rates', 'IBJA rates used to value gold and silver', true],
     ['/plan', 'Invest new money', 'Questions → where to put it, which account', can('add')],
@@ -37,11 +38,6 @@ export default function More() {
           ))}
       </div>
       {store.mode === 'live' && <PriceStatus />}
-      <Card title="Coming next">
-        <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
-          <li>FIRE calculator: your number, years to reach it, extra SIP needed</li>
-        </ul>
-      </Card>
       <Card title="Install on your phone">
         <p className="text-sm text-slate-600">Open this page in Chrome on Android → ⋮ menu → <b>Add to Home screen</b> / <b>Install app</b>. It opens like a normal app.</p>
       </Card>

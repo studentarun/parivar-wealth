@@ -4,3 +4,4 @@ html,body{background:#f8fafc;color:#0f172a;font-family:system-ui,-apple-system,"
 input,select,textarea{border:1px solid #cbd5e1;border-radius:.5rem;padding:.5rem .75rem;background:#fff;width:100%}
 input:focus,select:focus,textarea:focus{outline:2px solid #0f766e;outline-offset:0}
 
+input[type=checkbox],input[type=radio]{width:auto;padding:0;flex-shrink:0;accent-color:#0f766e;height:1rem;width:1rem}

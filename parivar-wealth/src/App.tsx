@@ -23,6 +23,7 @@ import Activity from './pages/settings/Activity'
 import History from './pages/History'
 import Plan from './pages/Plan'
 const Trends = lazy(() => import('./pages/Trends'))
+const Fire = lazy(() => import('./pages/Fire'))
 import Wealth from './pages/wealth/Wealth'
 import AssetEdit from './pages/wealth/AssetEdit'
 import AssetDetail from './pages/wealth/AssetDetail'
@@ -271,6 +272,7 @@ function Shell({ banner }: { banner?: React.ReactNode }) {
               <Route path="/h/:holder/:inst" element={<HoldingDetail />} />
               <Route path="/invest" element={<Invest />} />
               <Route path="/plan" element={<Plan />} />
+              <Route path="/fire" element={<Suspense fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}><Fire /></Suspense>} />
               <Route path="/wealth" element={<Wealth />} />
               <Route path="/wealth/new" element={<AssetEdit />} />
               <Route path="/wealth/:id" element={<AssetDetail />} />

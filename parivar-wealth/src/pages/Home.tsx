@@ -48,6 +48,12 @@ export default function Home() {
           {nw.items.length === 0 && <div className="mt-1 text-xs text-slate-500">Add FDs, gold, property and loans in the Wealth tab.</div>}
         </Card>
       </Link>
+      <Link to="/fire" className="flex items-center justify-between rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900 hover:bg-teal-100">
+        <span>
+          🔥 <b>FIRE plan</b> — when can you retire, and what does it take?
+        </span>
+        <span>→</span>
+      </Link>
       <div className="flex items-end justify-between">
         <h1 className="text-xl font-semibold">Funds & stocks</h1>
         <span className="text-xs text-slate-500">Prices as of {fmtDate(d.pricesAsOf)}</span>
