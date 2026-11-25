@@ -1,0 +1,64 @@
+import { Link } from 'react-router-dom'
+import { useApp } from '../app/state'
+import { Badge, Card, Page } from '../app/ui'
+
+export default function More() {
+  const { me, can, store } = useApp()
+  const items: [string, string, string, boolean][] = [
+    ['/more/family', 'Family members', 'Names, yearly income, clubbing — used for tax tips', true],
+    ['/more/funds', 'Funds & stocks', 'Category, tax type, keep or exit, exit load', true],
+    ['/plan', 'Invest new money', 'Questions → where to put it, which account', can('add')],
+    ['/sips', 'SIPs', 'Pause, edit or stop monthly SIPs', true],
+    ['/history', 'History', 'All entries and profit booked per year', true],
+    ['/more/import', 'Import Excel', 'Load your existing tracker', can('settings')],
+    ['/more/rules', 'Tax rules', 'Rates & limits — update after every Budget', true],
+    ['/more/users', 'Family logins & permissions', 'Who can see, add, withdraw, delete', me.role === 'admin'],
+    ['/more/activity', 'Activity log', 'Who changed what, when', me.role === 'admin'],
+  ]
+  return (
+    <Page title="More">
+      <Card>
+        <div className="text-sm">
+          Signed in as <b>{me.display_name}</b> <Badge tone="teal">{me.role}</Badge> {store.mode === 'demo' && <Badge tone="amber">demo</Badge>}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">{me.email}</div>
+      </Card>
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        {items
+          .filter((i) => i[3])
+          .map(([to, t, s]) => (
+            <Link key={to} to={to} className="block p-3 hover:bg-slate-50">
+              <div className="text-sm font-medium">{t}</div>
+              <div className="text-xs text-slate-500">{s}</div>
+            </Link>
+          ))}
+      </div>
+      <Card title="Coming next">
+        <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
+          <li>FDs, gold/silver, property, EPF/PPF/NPS, loans — full net worth with photos</li>
+          <li>FIRE calculator: your number, years to reach it, extra SIP needed</li>
+        </ul>
+      </Card>
+      <Card title="Install on your phone">
+        <p className="text-sm text-slate-600">Open this page in Chrome on Android → ⋮ menu → <b>Add to Home screen</b> / <b>Install app</b>. It opens like a normal app.</p>
+      </Card>
+      <div className="flex gap-4 text-sm">
+        {store.mode === 'live' && (
+          <button className="text-rose-700" onClick={() => store.signOut().then(() => location.reload())}>
+            Sign out
+          </button>
+        )}
+        {store.mode === 'demo' && (
+          <button
+            className="text-rose-700"
+            onClick={() => {
+              if (confirm('Delete all demo data in this browser?')) store.reset!().then(() => location.reload())
+            }}
+          >
+            Clear demo data
+          </button>
+        )}
+      </div>
+    </Page>
+  )
+}
