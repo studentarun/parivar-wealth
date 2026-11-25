@@ -1,31 +1,57 @@
 import { toISODate } from '../src/core/dates'
 import type { PricePoint } from '../src/core/types'
 
-/** AMFI NAVAll.txt: Scheme Code;ISIN Div Payout/ISIN Growth;ISIN Div Reinvestment;Scheme Name;Net Asset Value;Date */
-export function parseNavAll(txt: string) {
-  const out: { code: string; name: string; nav: number; nav_date: string }[] = []
+/** Column positions from the file's own header line (AMFI changes the layout from time to time). */
+function amfiColumns(txt: string) {
+  const head = txt.split(/\r?\n/).find((l) => /scheme code/i.test(l)) ?? ''
+  const h = head.split(';').map((x) => x.trim().toLowerCase())
+  const at = (...names: string[]) => {
+    for (const n of names) {
+      const i = h.indexOf(n)
+      if (i >= 0) return i
+    }
+    return -1
+  }
+  return {
+    code: Math.max(0, at('scheme code')),
+    name: at('scheme name', 'nav name'),
+    plan: at('plan'),
+    option: at('option'),
+    nav: at('net asset value'),
+    date: at('date'),
+  }
+}
+
+function rows(txt: string) {
+  const c = amfiColumns(txt)
+  const out: { code: string; name: string; nav: number; date: string }[] = []
   for (const line of txt.split(/\r?\n/)) {
     const p = line.split(';')
-    if (p.length < 6 || !/^\d+$/.test(p[0].trim())) continue
-    const nav = Number(p[4])
-    const d = toISODate(p[5].trim())
+    if (p.length < 5 || !/^\d+$/.test(p[c.code]?.trim() ?? '')) continue
+    const nav = Number(p[c.nav >= 0 ? c.nav : p.length - 2])
+    const d = toISODate((p[c.date >= 0 ? c.date : p.length - 1] ?? '').trim())
     if (!isFinite(nav) || !d) continue
-    out.push({ code: p[0].trim(), name: p[3].trim(), nav, nav_date: d })
+    let name = (p[c.name >= 0 ? c.name : 3] ?? '').trim()
+    const plan = c.plan >= 0 ? p[c.plan]?.trim() : ''
+    const option = c.option >= 0 ? p[c.option]?.trim() : ''
+    // NAVAll has the plan/option in separate columns — add them so "Direct … Growth" is searchable
+    if (plan && !name.toLowerCase().includes(plan.toLowerCase().replace(' plan', ''))) name += ` - ${plan}`
+    if (option && !name.toLowerCase().includes(option.toLowerCase().replace(' option', ''))) name += ` - ${option}`
+    out.push({ code: p[c.code].trim(), name, nav, date: d })
   }
   return out
 }
 
-/** AMFI history: Scheme Code;Scheme Name;ISIN Div Payout/ISIN Growth;ISIN Div Reinvestment;Net Asset Value;Repurchase Price;Sale Price;Date */
+/** AMFI NAVAll.txt (latest NAV of every scheme) */
+export function parseNavAll(txt: string) {
+  return rows(txt).map((r) => ({ code: r.code, name: r.name, nav: r.nav, nav_date: r.date }))
+}
+
+/** AMFI NAV history report */
 export function parseNavHistory(txt: string, tracked: Set<string>): PricePoint[] {
-  const rows: PricePoint[] = []
-  for (const line of txt.split(/\r?\n/)) {
-    const p = line.split(';')
-    if (p.length < 8 || !tracked.has(p[0].trim())) continue
-    const nav = Number(p[4])
-    const d = toISODate(p[7].trim())
-    if (isFinite(nav) && d) rows.push({ key: `MF:${p[0].trim()}`, date: d, price: nav })
-  }
-  return rows
+  return rows(txt)
+    .filter((r) => tracked.has(r.code))
+    .map((r) => ({ key: `MF:${r.code}`, date: r.date, price: r.nav }))
 }
 
 /** NSE CM bhavcopy (UDiFF format, since Jul 2024) */
